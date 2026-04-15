@@ -97,7 +97,11 @@ const state = {
     
     // Session
     sessionStartTime: null,
-    sessionId: null
+    sessionId: null,
+    
+    // User Authentication
+    user: null,
+    authToken: null
 };
 
 // ==================== DOM Elements ====================
@@ -109,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
     initAudioVisualizer();
     loadSessionData();
+    checkAuthStatus();
 });
 
 function initializeElements() {
@@ -117,7 +122,9 @@ function initializeElements() {
         'vision-status', 'vision-text', 'audio-status', 'audio-status-text',
         'chord-symbol', 'chord-name', 'detection-source', 'timer-value',
         'accuracy', 'speed', 'consistency', 'session-time',
-        'feedback-list', 'tab-content', 'audio-visualizer'
+        'feedback-list', 'tab-content', 'audio-visualizer',
+        'auth-modal', 'login-form', 'register-form', 'chord-suggestions',
+        'chord-diagrams', 'user-info'
     ];
     
     ids.forEach(id => {
@@ -125,8 +132,274 @@ function initializeElements() {
     });
     
     elements.canvasCtx = elements['output-canvas'].getContext('2d');
+    
+    // Setup auth event listeners
+    setupAuthEvents();
 }
 
+function setupAuthEvents() {
+    // Auth buttons
+    const loginBtn = document.getElementById('login-btn');
+    const registerBtn = document.getElementById('register-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    
+    if (loginBtn) loginBtn.addEventListener('click', showLoginModal);
+    if (registerBtn) registerBtn.addEventListener('click', showRegisterModal);
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+    
+    // Form submissions
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (registerForm) registerForm.addEventListener('submit', handleRegister);
+    
+    // Close modal
+    const closeModal = document.getElementById('close-modal');
+    if (closeModal) closeModal.addEventListener('click', hideAuthModal);
+}
+
+// ==================== Authentication ====================
+async function checkAuthStatus() {
+    const token = localStorage.getItem('fretfly_token');
+    if (token) {
+        state.authToken = token;
+        try {
+            const response = await fetch('/api/sessions', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                state.user = JSON.parse(localStorage.getItem('fretfly_user'));
+                updateAuthUI(true);
+            } else {
+                localStorage.removeItem('fretfly_token');
+                localStorage.removeItem('fretfly_user');
+                updateAuthUI(false);
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            updateAuthUI(false);
+        }
+    }
+}
+
+function updateAuthUI(isLoggedIn) {
+    const authButtons = document.getElementById('auth-buttons');
+    const userInfo = document.getElementById('user-info');
+    
+    if (authButtons) authButtons.style.display = isLoggedIn ? 'none' : 'flex';
+    if (userInfo) {
+        userInfo.style.display = isLoggedIn ? 'flex' : 'none';
+        if (isLoggedIn && state.user) {
+            userInfo.innerHTML = `
+                <span>Welcome, ${state.user.username}!</span>
+                <button class="btn btn-danger" id="logout-btn">Logout</button>
+            `;
+            document.getElementById('logout-btn').addEventListener('click', logout);
+        }
+    }
+}
+
+function showLoginModal() {
+    elements['auth-modal'].style.display = 'block';
+    document.getElementById('login-form').style.display = 'block';
+    document.getElementById('register-form').style.display = 'none';
+}
+
+function showRegisterModal() {
+    elements['auth-modal'].style.display = 'block';
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('register-form').style.display = 'block';
+}
+
+function hideAuthModal() {
+    elements['auth-modal'].style.display = 'none';
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            state.authToken = data.token;
+            state.user = data.user;
+            localStorage.setItem('fretfly_token', data.token);
+            localStorage.setItem('fretfly_user', JSON.stringify(data.user));
+            hideAuthModal();
+            updateAuthUI(true);
+            addFeedback('good', 'Login successful!');
+        } else {
+            addFeedback('bad', data.error || 'Login failed');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        addFeedback('bad', 'Network error during login');
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    const username = document.getElementById('register-username').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+    
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            addFeedback('good', 'Registration successful! Please login.');
+            showLoginModal();
+        } else {
+            addFeedback('bad', data.error || 'Registration failed');
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        addFeedback('bad', 'Network error during registration');
+    }
+}
+
+function logout() {
+    state.authToken = null;
+    state.user = null;
+    localStorage.removeItem('fretfly_token');
+    localStorage.removeItem('fretfly_user');
+    updateAuthUI(false);
+    addFeedback('info', 'Logged out successfully');
+}
+
+// ==================== Backend Integration ====================
+async function saveSessionToBackend() {
+    if (!state.authToken || !state.user) return;
+    
+    try {
+        const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.authToken}`
+            },
+            body: JSON.stringify({
+                metrics: state.metrics,
+                tabHistory: state.tabHistory,
+                chordHistory: state.metrics.chordHistory
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            addFeedback('good', 'Session saved to cloud!');
+        } else {
+            console.error('Backend save failed:', data.error);
+        }
+    } catch (error) {
+        console.error('Backend save error:', error);
+    }
+}
+
+async function loadChordSuggestions(chordName) {
+    if (!state.authToken) return;
+    
+    try {
+        const response = await fetch(`/api/chord-suggestions/${chordName}`, {
+            headers: {
+                'Authorization': `Bearer ${state.authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayChordSuggestions(data);
+        }
+    } catch (error) {
+        console.error('Chord suggestions error:', error);
+    }
+}
+
+async function loadChordDiagram(chordName) {
+    if (!state.authToken) return;
+    
+    try {
+        const response = await fetch(`/api/chord-diagrams/${chordName}`, {
+            headers: {
+                'Authorization': `Bearer ${state.authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayChordDiagram(data);
+        }
+    } catch (error) {
+        console.error('Chord diagram error:', error);
+    }
+}
+
+function displayChordSuggestions(data) {
+    const container = elements['chord-suggestions'];
+    if (!container) return;
+    
+    container.innerHTML = `
+        <h4>🎵 Suggested Next Chords</h4>
+        <div class="suggestions-grid">
+            ${data.circleOfFifths.map(chord => `
+                <button class="btn btn-secondary suggestion-btn" onclick="loadChordDiagram('${chord}')">
+                    ${chord}
+                </button>
+            `).join('')}
+        </div>
+        <div style="margin-top: 10px; font-size: 0.8rem; color: #64748b;">
+            ${data.explanation}
+        </div>
+    `;
+}
+
+function displayChordDiagram(data) {
+    const container = elements['chord-diagrams'];
+    if (!container) return;
+    
+    container.innerHTML = `
+        <h4>🎸 ${data.chord} Chord</h4>
+        <div class="chord-info">
+            <div class="chord-tab">${data.diagram}</div>
+            <p>${data.description}</p>
+            <h5>Tutorial Videos:</h5>
+            ${data.tutorialVideos.map(video => `
+                <div class="video-link">
+                    <a href="${video.url}" target="_blank">${video.title}</a>
+                    <span>(${video.duration})</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// ==================== Initialization (Updated) ====================
 async function initializeApp() {
     updateVisionStatus('loading', 'Loading MediaPipe...');
     
@@ -178,7 +451,7 @@ async function initializeApp() {
     }
 }
 
-// ==================== Camera & Analysis Control ====================
+// ==================== Camera & Analysis Control (Updated) ====================
 async function startAnalysis() {
     try {
         await window.camera.start();
@@ -217,34 +490,201 @@ function stopAnalysis() {
     elements.canvasCtx.clearRect(0, 0, elements['output-canvas'].width, elements['output-canvas'].height);
     
     saveSessionData();
+    
+    // Save to backend if authenticated
+    if (state.authToken) {
+        saveSessionToBackend();
+    }
 }
 
-async function toggleAudio() {
-    if (!state.audioEnabled) {
-        try {
-            await initAudio();
-            state.audioEnabled = true;
-            elements['audio-btn'].classList.remove('btn-success');
-            elements['audio-btn'].classList.add('btn-primary');
-            elements['audio-btn'].innerHTML = '<span>🎤</span> Audio On';
-            document.getElementById('audio-status').classList.add('audio-active');
-            document.getElementById('audio-status-text').textContent = 'Listening...';
-            addFeedback('good', 'Audio analysis enabled');
-        } catch (error) {
-            console.error('Audio init failed:', error);
-            addFeedback('bad', 'Microphone access denied');
+// ==================== Vision Results Handler (Updated) ====================
+function onVisionResults(results) {
+    // Resize canvas
+    elements['output-canvas'].width = elements.webcam.videoWidth;
+    elements['output-canvas'].height = elements.webcam.videoHeight;
+    
+    // Clear canvas
+    elements.canvasCtx.clearRect(0, 0, elements['output-canvas'].width, elements['output-canvas'].height);
+    
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        state.handLandmarks = landmarks;
+        
+        // Draw landmarks
+        drawLandmarks(landmarks);
+        
+        // Detect chord from hand position
+        const chord = detectChordFromVision(landmarks);
+        processVisionChordDetection(chord);
+        
+    } else {
+        state.handLandmarks = null;
+        
+        // Only show "no hand" if audio also isn't detecting anything
+        if (!state.audioEnabled) {
+            updateChordDisplay('--', 'No hand detected', null);
+        }
+    }
+}
+
+// ==================== Chord Detection (Updated) ====================
+function processVisionChordDetection(chord) {
+    if (!chord) return;
+    
+    // Stability check
+    if (state.currentChord && state.currentChord.name === chord.name) {
+        state.stabilityCount++;
+        
+        if (state.stabilityCount >= CONFIG.stabilityFrames) {
+            if (!state.chordStartTime) {
+                state.chordStartTime = Date.now();
+            }
+            
+            const holdTime = (Date.now() - state.chordStartTime) / 1000;
+            updateChordDisplay(chord.name, getChordFullName(chord.name), 'vision');
+            updateTimer(holdTime);
+            
+            // Check posture
+            checkPosture(chord);
+            
+            // Load chord suggestions and diagrams
+            loadChordSuggestions(chord.name);
+            loadChordDiagram(chord.name);
         }
     } else {
-        if (state.analyser) {
-            state.analyser.disconnect();
+        // New chord
+        if (state.currentChord && state.stabilityCount >= CONFIG.stabilityFrames) {
+            recordTransition(state.currentChord.name, chord.name);
         }
-        state.audioEnabled = false;
-        elements['audio-btn'].classList.remove('btn-primary');
-        elements['audio-btn'].classList.add('btn-success');
-        elements['audio-btn'].innerHTML = '<span>🎤</span> Enable Audio';
-        document.getElementById('audio-status').classList.remove('audio-active');
-        document.getElementById('audio-status-text').textContent = 'Microphone off';
-        addFeedback('info', 'Audio analysis disabled');
+        
+        state.previousChord = state.currentChord;
+        state.currentChord = chord;
+        state.stabilityCount = 1;
+        state.chordStartTime = null;
+        state.transitionStartTime = Date.now();
+        
+        updateChordDisplay(chord.name, getChordFullName(chord.name), 'vision');
+        addToTabHistory(chord.name);
+        addFeedback('info', `Detected: ${getChordFullName(chord.name)}`);
+        
+        // Load chord suggestions and diagrams for new chord
+        loadChordSuggestions(chord.name);
+        loadChordDiagram(chord.name);
+    }
+}
+
+// ==================== Audio Analysis (Updated) ====================
+function processAudioChordDetection(chordName) {
+    // Audio detection is less stable, so we use it to supplement vision
+    if (state.currentChord && state.currentChord.name === chordName) {
+        return; // Already detected
+    }
+    
+    // Only use audio detection if vision isn't providing confident results
+    const chord = {
+        name: chordName,
+        data: CONFIG.chordSignatures[chordName],
+        confidence: 0.7,
+        source: 'audio'
+    };
+    
+    // Process similarly to vision detection but with lower priority
+    if (!state.currentChord || state.metrics.totalTransitions === 0) {
+        updateChordDisplay(chord.name, getChordFullName(chord.name), 'audio');
+        addToTabHistory(chord.name);
+        
+        // Load chord suggestions and diagrams
+        loadChordSuggestions(chord.name);
+        loadChordDiagram(chord.name);
+    }
+}
+
+// ==================== Tab Generation (Updated) ====================
+function addToTabHistory(chordName) {
+    const tab = CONFIG.chordTabs[chordName];
+    if (!tab) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const tabEntry = {
+        chord: chordName,
+        tab: tab,
+        time: timestamp
+    };
+    
+    state.tabHistory.push(tabEntry);
+    
+    // Keep last 50 entries
+    if (state.tabHistory.length > 50) {
+        state.tabHistory.shift();
+    }
+    
+    updateTabDisplay();
+    
+    // Add to chord history for backend
+    state.metrics.chordHistory.push({
+        chord: chordName,
+        timestamp: new Date().toISOString()
+    });
+}
+
+// ==================== UI Updates (Updated) ====================
+function updateChordDisplay(symbol, name, source) {
+    elements['chord-symbol'].textContent = symbol;
+    elements['chord-name'].textContent = name;
+    
+    const sourceEl = elements['detection-source'];
+    sourceEl.textContent = source ? `${source.toUpperCase()} detection` : 'No detection';
+    sourceEl.className = 'detection-source';
+    if (source) {
+        sourceEl.classList.add(source);
+    }
+}
+
+// ==================== Utility Functions (Updated) ====================
+function getChordFullName(chordName) {
+    const names = {
+        'C': 'C Major', 'D': 'D Major', 'E': 'E Major', 'F': 'F Major',
+        'G': 'G Major', 'A': 'A Major', 'B': 'B Major',
+        'Am': 'A Minor', 'Em': 'E Minor', 'Dm': 'D Minor'
+    };
+    return names[chordName] || chordName;
+}
+
+// ==================== LocalStorage Persistence (Updated) ====================
+function saveSessionData() {
+    const data = {
+        metrics: state.metrics,
+        tabHistory: state.tabHistory,
+        sessionTime: state.sessionStartTime,
+        transitionTimes: state.metrics.transitionTimes,
+        user: state.user
+    };
+    
+    try {
+        localStorage.setItem('fretfly_session', JSON.stringify(data));
+    } catch (e) {
+        console.warn('Could not save to localStorage:', e);
+    }
+}
+
+function loadSessionData() {
+    try {
+        const saved = localStorage.getItem('fretfly_session');
+        if (saved) {
+            const data = JSON.parse(saved);
+            // Restore metrics but not active state
+            if (data.metrics) {
+                state.metrics = data.metrics;
+                updateMetrics();
+            }
+            if (data.tabHistory) {
+                state.tabHistory = data.tabHistory;
+                updateTabDisplay();
+            }
+            console.log('Previous session data loaded');
+        }
+    } catch (e) {
+        console.warn('Could not load from localStorage:', e);
     }
 }
 
@@ -349,27 +789,6 @@ function detectChordFromAudio(dataArray) {
     return bestMatch;
 }
 
-function processAudioChordDetection(chordName) {
-    // Audio detection is less stable, so we use it to supplement vision
-    if (state.currentChord && state.currentChord.name === chordName) {
-        return; // Already detected
-    }
-    
-    // Only use audio detection if vision isn't providing confident results
-    const chord = {
-        name: chordName,
-        data: CONFIG.chordSignatures[chordName],
-        confidence: 0.7,
-        source: 'audio'
-    };
-    
-    // Process similarly to vision detection but with lower priority
-    if (!state.currentChord || state.metrics.totalTransitions === 0) {
-        updateChordDisplay(chord.name, getChordFullName(chord.name), 'audio');
-        addToTabHistory(chord.name);
-    }
-}
-
 function initAudioVisualizer() {
     const container = elements['audio-visualizer'];
     for (let i = 0; i < 32; i++) {
@@ -388,36 +807,6 @@ function updateAudioVisualizer(dataArray) {
         const value = dataArray[i * step];
         const height = Math.max(2, (value / 255) * 40);
         bars[i].style.height = `${height}px`;
-    }
-}
-
-// ==================== Vision Results Handler ====================
-function onVisionResults(results) {
-    // Resize canvas
-    elements['output-canvas'].width = elements.webcam.videoWidth;
-    elements['output-canvas'].height = elements.webcam.videoHeight;
-    
-    // Clear canvas
-    elements.canvasCtx.clearRect(0, 0, elements['output-canvas'].width, elements['output-canvas'].height);
-    
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmarks = results.multiHandLandmarks[0];
-        state.handLandmarks = landmarks;
-        
-        // Draw landmarks
-        drawLandmarks(landmarks);
-        
-        // Detect chord from hand position
-        const chord = detectChordFromVision(landmarks);
-        processVisionChordDetection(chord);
-        
-    } else {
-        state.handLandmarks = null;
-        
-        // Only show "no hand" if audio also isn't detecting anything
-        if (!state.audioEnabled) {
-            updateChordDisplay('--', 'No hand detected', null);
-        }
     }
 }
 
@@ -554,43 +943,6 @@ function detectChordFromVision(landmarks) {
     return null;
 }
 
-function processVisionChordDetection(chord) {
-    if (!chord) return;
-    
-    // Stability check
-    if (state.currentChord && state.currentChord.name === chord.name) {
-        state.stabilityCount++;
-        
-        if (state.stabilityCount >= CONFIG.stabilityFrames) {
-            if (!state.chordStartTime) {
-                state.chordStartTime = Date.now();
-            }
-            
-            const holdTime = (Date.now() - state.chordStartTime) / 1000;
-            updateChordDisplay(chord.name, getChordFullName(chord.name), 'vision');
-            updateTimer(holdTime);
-            
-            // Check posture
-            checkPosture(chord);
-        }
-    } else {
-        // New chord
-        if (state.currentChord && state.stabilityCount >= CONFIG.stabilityFrames) {
-            recordTransition(state.currentChord.name, chord.name);
-        }
-        
-        state.previousChord = state.currentChord;
-        state.currentChord = chord;
-        state.stabilityCount = 1;
-        state.chordStartTime = null;
-        state.transitionStartTime = Date.now();
-        
-        updateChordDisplay(chord.name, getChordFullName(chord.name), 'vision');
-        addToTabHistory(chord.name);
-        addFeedback('info', `Detected: ${getChordFullName(chord.name)}`);
-    }
-}
-
 // ==================== Transition Analysis ====================
 function recordTransition(fromChord, toChord) {
     if (!state.transitionStartTime) return;
@@ -630,27 +982,6 @@ function checkPosture(chord) {
 }
 
 // ==================== Tab Generation ====================
-function addToTabHistory(chordName) {
-    const tab = CONFIG.chordTabs[chordName];
-    if (!tab) return;
-    
-    const timestamp = new Date().toLocaleTimeString();
-    const tabEntry = {
-        chord: chordName,
-        tab: tab,
-        time: timestamp
-    };
-    
-    state.tabHistory.push(tabEntry);
-    
-    // Keep last 50 entries
-    if (state.tabHistory.length > 50) {
-        state.tabHistory.shift();
-    }
-    
-    updateTabDisplay();
-}
-
 function updateTabDisplay() {
     if (state.tabHistory.length === 0) {
         elements['tab-content'].innerHTML = '<span style="color: #475569;">Start playing to see tabs...</span>';
@@ -712,18 +1043,6 @@ function exportTabs() {
 }
 
 // ==================== UI Updates ====================
-function updateChordDisplay(symbol, name, source) {
-    elements['chord-symbol'].textContent = symbol;
-    elements['chord-name'].textContent = name;
-    
-    const sourceEl = elements['detection-source'];
-    sourceEl.textContent = source ? `${source.toUpperCase()} detection` : 'No detection';
-    sourceEl.className = 'detection-source';
-    if (source) {
-        sourceEl.classList.add(source);
-    }
-}
-
 function updateTimer(seconds) {
     elements['timer-value'].textContent = `${seconds.toFixed(2)}s`;
 }
@@ -798,45 +1117,33 @@ function startMetricsTimer() {
     }, 1000);
 }
 
-// ==================== Utility Functions ====================
-function getChordFullName(chordName) {
-    const names = {
-        'C': 'C Major', 'D': 'D Major', 'E': 'E Major', 'F': 'F Major',
-        'G': 'G Major', 'A': 'A Major', 'B': 'B Major',
-        'Am': 'A Minor', 'Em': 'E Minor', 'Dm': 'D Minor'
-    };
-    return names[chordName] || chordName;
-}
-
-// ==================== LocalStorage Persistence ====================
-function saveSessionData() {
-    const data = {
-        metrics: state.metrics,
-        tabHistory: state.tabHistory,
-        sessionTime: state.sessionStartTime,
-        transitionTimes: state.metrics.transitionTimes
-    };
-    
-    try {
-        localStorage.setItem('fretfly_session', JSON.stringify(data));
-    } catch (e) {
-        console.warn('Could not save to localStorage:', e);
-    }
-}
-
-function loadSessionData() {
-    try {
-        const saved = localStorage.getItem('fretfly_session');
-        if (saved) {
-            const data = JSON.parse(saved);
-            // Restore metrics but not active state
-            if (data.metrics) {
-                // We don't auto-restore to avoid confusion
-                console.log('Previous session data available');
-            }
+// ==================== Audio Control ====================
+async function toggleAudio() {
+    if (!state.audioEnabled) {
+        try {
+            await initAudio();
+            state.audioEnabled = true;
+            elements['audio-btn'].classList.remove('btn-success');
+            elements['audio-btn'].classList.add('btn-primary');
+            elements['audio-btn'].innerHTML = '<span>🎤</span> Audio On';
+            document.getElementById('audio-status').classList.add('audio-active');
+            document.getElementById('audio-status-text').textContent = 'Listening...';
+            addFeedback('good', 'Audio analysis enabled');
+        } catch (error) {
+            console.error('Audio init failed:', error);
+            addFeedback('bad', 'Microphone access denied');
         }
-    } catch (e) {
-        console.warn('Could not load from localStorage:', e);
+    } else {
+        if (state.analyser) {
+            state.analyser.disconnect();
+        }
+        state.audioEnabled = false;
+        elements['audio-btn'].classList.remove('btn-primary');
+        elements['audio-btn'].classList.add('btn-success');
+        elements['audio-btn'].innerHTML = '<span>🎤</span> Enable Audio';
+        document.getElementById('audio-status').classList.remove('audio-active');
+        document.getElementById('audio-status-text').textContent = 'Microphone off';
+        addFeedback('info', 'Audio analysis disabled');
     }
 }
 

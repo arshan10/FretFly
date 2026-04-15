@@ -2,196 +2,284 @@
 
 **AI-Powered Guitar Practice Companion**
 
-FretFly uses computer vision (MediaPipe Hands) and audio analysis (Web Audio API) to track your guitar practice, detect chords, analyze transitions, and provide real-time feedback on your technique.
+A full-stack web application that uses computer vision (MediaPipe Hands) and audio analysis (Web Audio API) to track your guitar practice, detect chords, analyze transitions, and provide real-time feedback on your technique.
 
 ## ✨ Features
 
 ### Dual-Mode Chord Detection
-- **Vision Mode**: Uses MediaPipe Hands to track your fretting hand and detect chord shapes based on finger positions
-- **Audio Mode**: Analyzes microphone input to detect chords from the frequencies you play
-- **Combined**: Use both for more accurate detection
+- **Vision Mode**: Uses MediaPipe Hands to track your fretting hand
+- **Audio Mode**: Analyzes microphone input for frequency-based detection
+- **Combined**: Use both for maximum accuracy
 
-### Real-Time Hand Tracking
-- 21-point hand landmark detection
-- Visual overlay showing finger positions
-- Live finger curl status (curled vs extended)
-- Wrist angle monitoring for proper technique
+### Full-Stack Architecture
+- **Frontend**: Vanilla JavaScript with MediaPipe integration
+- **Backend**: Node.js + Express API
+- **Database**: PostgreSQL with SQL for user accounts and session storage
+- **Authentication**: JWT-based user authentication
 
 ### Guitar Tab Generation
-- Automatically generates tab notation as you play
-- Displays chord progressions in standard tab format
-- Export tabs to text file for later reference
+- Auto-generates tab notation as you play
+- Export tabs to text file
 
-### Transition Analysis
-- Tracks time between chord changes
-- Rates transitions:
-  - ⚡ Excellent: < 1 second
-  - 👍 Good: 1-2 seconds
-  - ⚠️ Needs Practice: > 2 seconds
+### Music Theory Integration
+- **Circle of Fifths** chord suggestions
+- Common progression patterns (pop, blues, classical, folk)
+- Suggested next chords based on current chord
 
 ### Practice Metrics
-- **Accuracy**: Percentage of successful (fast) transitions
-- **Transitions/min**: Speed of chord changes
-- **Consistency**: Based on standard deviation of transition times
-- **Session Time**: Total practice duration
+- Accuracy, transitions/min, consistency scores
+- Session time tracking
+- Cloud sync for authenticated users
 
-### Data Persistence
-- All session data saved to localStorage
-- Export your progress and tabs
-- No external database required
+## 🏗️ Tech Stack
+
+### Frontend
+- Vanilla JavaScript
+- MediaPipe Hands (Computer Vision)
+- Web Audio API
+- HTML5 Canvas
+
+### Backend
+- Node.js + Express
+- PostgreSQL (SQL Database)
+- JWT Authentication
+- bcrypt for password hashing
+
+### Popular Job Market Technologies Used:
+- **Node.js** - Most popular backend runtime
+- **PostgreSQL** - #1 SQL database (used by Uber, Instagram, etc.)
+- **Express.js** - Most popular Node.js framework
+- **React** (optional - can be added)
+- **JWT** - Industry standard for authentication
 
 ## 🚀 Quick Start
 
-### Option 1: Python Server
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+- Modern browser with WebRTC support
+
+### 1. Clone the Repository
 ```bash
-cd guitar-analyzer
+git clone git@github.com:arshan10/FretFly.git
+cd FretFly
+```
+
+### 2. Set Up PostgreSQL Database
+```bash
+# Create database
+createdb fretfly
+
+# Or using psql
+psql -U postgres
+CREATE DATABASE fretfly;
+\q
+```
+
+### 3. Configure Backend
+```bash
+cd backend
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your database credentials
+nano .env  # or use your preferred editor
+```
+
+### 4. Install Dependencies
+```bash
+# Backend
+cd backend
+npm install
+
+# Return to root
+cd ..
+```
+
+### 5. Start the Backend Server
+```bash
+cd backend
+npm start
+# Server runs on http://localhost:5000
+```
+
+### 6. Start the Frontend
+```bash
+# Option 1: Python server
 python3 server.py
-# Open http://localhost:8000 in your browser
-```
 
-### Option 2: Direct File
-Simply open `index.html` in a modern web browser.
+# Option 2: Direct file access
+open index.html
 
-### Option 3: Node.js Serve
-```bash
+# Option 3: npx serve
 npx serve .
-# Open the displayed URL
 ```
 
-## 📋 Requirements
-
-- **Browser**: Chrome 90+, Edge 90+, Firefox 89+, Safari 14+
-- **Camera**: Required for vision-based chord detection
-- **Microphone**: Optional, for audio-based chord detection
-- **Permissions**: Camera and optionally microphone access
-
-## 🎯 How to Use
-
-### 1. Start the Application
-Open FretFly in your browser and click **Start** to begin.
-
-### 2. Position Your Hand
-- Position your **fretting hand** (left hand for right-handed players) in view of the camera
-- Hold your guitar in normal playing position
-- Ensure good lighting for best detection
-
-### 3. Enable Audio (Optional)
-Click **Enable Audio** to allow FretFly to also analyze the sounds you play for more accurate chord detection.
-
-### 4. Play Chords
-- Form chord shapes with your fretting hand
-- Strum the strings
-- Watch as FretFly detects your chords and generates tabs
-
-### 5. Review Your Practice
-- Check the **Practice Metrics** for your performance stats
-- Review **Real-time Feedback** for technique tips
-- Export your tabs when done
-
-## 🎸 Supported Chords
-
-FretFly can detect the following chords:
-
-| Major | Minor |
-|-------|-------|
-| C | Am |
-| D | Em |
-| E | Dm |
-| F | |
-| G | |
-| A | |
-| B | |
-
-## 🏗️ Architecture
+## 📁 Project Structure
 
 ```
 FretFly/
-├── index.html      # Main UI with modern dark theme
-├── app.js          # Core application logic
-│                   # - MediaPipe Hands integration
-│                   # - Web Audio API analysis
-│                   # - Chord detection algorithms
-│                   # - Tab generation
-│                   # - LocalStorage persistence
-├── server.py       # Simple Python HTTP server
-├── package.json    # Project metadata
-└── README.md       # This file
+├── index.html              # Main frontend UI
+├── app.js                  # Frontend JavaScript
+├── package.json            # Frontend package config
+├── server.py               # Simple Python server
+├── README.md               # This file
+│
+├── backend/                # Node.js + PostgreSQL backend
+│   ├── server.js           # Express API server
+│   ├── package.json        # Backend dependencies
+│   └── .env.example        # Environment template
+│
+└── .gitignore              # Git ignore file
 ```
 
-## 🔧 Configuration
+## 🗄️ Database Schema
 
-You can adjust settings in `app.js`:
-
-```javascript
-const CONFIG = {
-    // MediaPipe settings
-    modelComplexity: 0,        // 0=light, 1=balanced, 2=heavy
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.3,
-    
-    // Audio settings
-    fftSize: 2048,
-    smoothingTime: 0.8,
-    
-    // Chord definitions
-    chordSignatures: { ... },
-    chordTabs: { ... }
-};
+### Users Table
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
 ```
+
+### Practice Sessions Table
+```sql
+CREATE TABLE practice_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    metrics JSONB NOT NULL,
+    tab_history JSONB NOT NULL,
+    chord_history JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## 🔌 API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/register` | Register new user |
+| POST | `/api/login` | User login |
+
+### Sessions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/sessions` | Get user's practice sessions |
+| POST | `/api/sessions` | Save practice session |
+
+### Chord Resources
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/chord-suggestions/:chord` | Get chord suggestions |
+| GET | `/api/chord-diagrams/:chord` | Get chord diagram |
+
+## 🎸 Music Theory: Circle of Fifths
+
+The Circle of Fifths is a music theory concept that shows relationships between chords. FretFly uses this to suggest chords that sound good together:
+
+```
+        C
+    G       F
+  D           Bb
+A               Eb
+  E           Ab
+    B       F#
+        F#
+```
+
+Common progressions:
+- **Pop**: I - V - vi - IV (C - G - Am - F)
+- **Blues**: I - I - I - I - IV - IV - I - I - V - IV - I - I
+- **Classical**: I - IV - V - I
+- **Folk**: I - IV - V - vi
+
+## 📊 SQL vs NoSQL
+
+### SQL (PostgreSQL) - Used in FretFly
+- Structured data with relationships
+- ACID compliance for data integrity
+- Complex queries with JOINs
+- Used by: Instagram, Uber, Spotify
+
+### NoSQL (MongoDB)
+- Flexible schema
+- Horizontal scaling
+- Document-based storage
+- Used by: Netflix, Airbnb, eBay
+
+**Why PostgreSQL for FretFly?**
+- User data has clear relationships (users → sessions)
+- Data integrity is important for practice records
+- SQL skills are highly valued in job market
 
 ## 🛠️ Development
 
-### Running Locally
+### Running in Development
 ```bash
-# Using Python
+# Terminal 1: Backend
+cd backend
+npm run dev  # Uses nodemon for auto-reload
+
+# Terminal 2: Frontend
 python3 server.py
-
-# Using Node.js
-npx serve .
-
-# Direct file access
-open index.html
 ```
 
-### Modifying Chord Detection
-Add or modify chords in the `CONFIG.chordSignatures` and `CONFIG.chordTabs` objects in `app.js`.
+### Adding New Chords
+Edit `app.js` CONFIG object:
+```javascript
+chordSignatures: {
+    'C7': { root: 130.81, type: 'dominant', strings: [0, 3, 2, 3, 1, 0] },
+},
+chordTabs: {
+    'C7': 'x32310',
+}
+```
 
-### Adding Features
-The codebase is modular with clear separation:
-- Vision handling: `onVisionResults()`, `detectChordFromVision()`
-- Audio handling: `analyzeAudio()`, `detectChordFromAudio()`
-- UI updates: `updateChordDisplay()`, `updateMetrics()`, `addFeedback()`
+### Adding New Features
+1. Create API endpoint in `backend/server.js`
+2. Add frontend function to call API
+3. Update UI to display results
 
-## 📊 Data & Privacy
+## 🚀 Deployment
 
-- **No external servers**: All processing happens in your browser
-- **No data collection**: FretFly doesn't send any data anywhere
-- **Local storage only**: Session data is saved to your browser's localStorage
-- **Export your data**: Use the Export feature to download your tabs and metrics
+### Backend (Choose one)
+- **Railway.app** - Easy PostgreSQL + Node.js deployment
+- **Render.com** - Free tier available
+- **Heroku** - Popular but limited free tier
+- **AWS/GCP/Azure** - Enterprise options
 
-## 🐛 Troubleshooting
+### Frontend
+- **Vercel** - Free hosting for static sites
+- **Netlify** - Easy deployment with CI/CD
+- **GitHub Pages** - Free for static content
 
-### Hand Not Detected
-- Ensure good lighting on your fretting hand
-- Move your hand closer to the camera (30-60cm ideal)
-- Make sure fingers are visible, not obscured by the guitar neck
-- Try lowering the detection threshold in CONFIG if needed
+## 📚 Learning Resources
 
-### Audio Not Working
-- Check browser permissions for microphone access
-- Ensure no other application is using the microphone
-- Try refreshing the page
+### SQL
+- [PostgreSQL Tutorial](https://www.postgresqltutorial.com/)
+- [SQLZoo](https://sqlzoo.net/)
 
-### Chord Detection Inaccurate
-- Make clear, distinct chord shapes
-- For vision: Keep fingers properly curled on the fretboard
-- For audio: Strum clearly and let chords ring out
-- Enable both vision and audio for best results
+### Node.js
+- [Node.js Documentation](https://nodejs.org/docs)
+- [Express.js Guide](https://expressjs.com/en/guide/routing.html)
 
-### Performance Issues
-- Close other browser tabs
-- Lower the model complexity in CONFIG
-- Reduce camera resolution (modify in `initializeApp()`)
+### Music Theory
+- [Hooktheory](https://www.hooktheory.com/theory)
+- [Music Theory for Guitar](https://www.justinguitar.com/)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## 📄 License
 
@@ -199,8 +287,9 @@ MIT License - Feel free to use, modify, and distribute.
 
 ## 🙏 Acknowledgments
 
-- [MediaPipe](https://mediapipe.dev/) for the excellent hand tracking
-- [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) for audio analysis capabilities
+- [MediaPipe](https://mediapipe.dev/) for hand tracking
+- [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
+- PostgreSQL community
 
 ---
 
