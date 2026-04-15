@@ -1,0 +1,20 @@
+{
+  "name": "fretfly",
+  "version": "1.0.0",
+  "description": "AI-Powered Guitar Practice Companion - Uses computer vision and audio analysis to track your guitar practice",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 server.py",
+    "serve": "npx serve ."
+  },
+  "keywords": [
+    "guitar",
+    "practice",
+    "computer-vision",
+    "mediapipe",
+    "chord-detection",
+    "music"
+  ],
+  "author": "FretFly Team",
+  "license": "MIT"
+}

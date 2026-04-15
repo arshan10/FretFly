@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FretFly - Guitar Practice Analyzer</title>
+    <style>
+        :root {
+            --primary-color: #7c3aed;
+            --secondary-color: #10b981;
+            --danger-color: #ef4444;
+            --bg-color: #0f172a;
+            --text-color: #f1f5f9;
+            --card-bg: #1e293b;
+            --accent: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary-color), #4c1d95);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            background: linear-gradient(to right, #fff, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            color: #a78bfa;
+            font-size: 1rem;
+            margin-top: 5px;
+        }
+
+        /* Tab Display */
+        .tab-display {
+            background: var(--card-bg);
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid #334155;
+        }
+
+        .tab-display h3 {
+            margin: 0 0 15px 0;
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+
+        .tab-content {
+            font-family: 'Courier New', monospace;
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #94a3b8;
+            min-height: 100px;
+        }
+
+        .tab-chord {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        .tab-string {
+            color: #64748b;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            padding: 0 20px 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Video Container */
+        .video-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+            aspect-ratio: 16/9;
+            min-height: 400px;
+            border: 2px solid #334155;
+        }
+
+        #webcam {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #output-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid #334155;
+        }
+
+        .card h3 {
+            margin: 0 0 15px 0;
+            color: var(--primary-color);
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Status */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #475569;
+            flex-shrink: 0;
+        }
+
+        .status-dot.active {
+            background: var(--secondary-color);
+            box-shadow: 0 0 10px var(--secondary-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.audio-active {
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #6d28d9;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        .btn:disabled {
+            background: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Chord Display */
+        .chord-display {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .chord-symbol {
+            font-size: 4rem;
+            font-weight: bold;
+            color: var(--accent);
+            text-shadow: 0 0 30px rgba(245, 158, 11, 0.3);
+        }
+
+        .chord-name {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+
+        .detection-source {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            background: #334155;
+            color: #94a3b8;
+        }
+
+        .detection-source.vision {
+            background: rgba(124, 58, 237, 0.3);
+            color: #a78bfa;
+        }
+
+        .detection-source.audio {
+            background: rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
+
+        .detection-source.both {
+            background: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .metric-item {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Timer */
+        .timer-display {
+            text-align: center;
+            padding: 15px;
+            background: #0f172a;
+            border-radius: 8px;
+        }
+
+        .timer-value {
+            font-size: 2rem;
+            font-family: monospace;
+            color: var(--danger-color);
+        }
+
+        .timer-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 5px;
+        }
+
+        /* Feedback */
+        .feedback-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .feedback-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: #0f172a;
+        }
+
+        .feedback-good {
+            border-left: 3px solid var(--secondary-color);
+        }
+
+        .feedback-bad {
+            border-left: 3px solid var(--danger-color);
+        }
+
+        .feedback-warning {
+            border-left: 3px solid var(--accent);
+        }
+
+        .feedback-info {
+            border-left: 3px solid var(--primary-color);
+        }
+
+        /* Audio Visualizer */
+        .audio-viz {
+            height: 40px;
+            background: #0f172a;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            padding: 5px;
+        }
+
+        .audio-bar {
+            flex: 1;
+            background: var(--accent);
+            border-radius: 2px;
+            transition: height 0.1s;
+            min-height: 2px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #64748b;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #334155;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span class="logo-icon">🦋</span>
+            <div>
+                <h1>FretFly</h1>
+                <p class="tagline">AI-Powered Guitar Practice Companion</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Guitar Tab Display -->
+    <div class="tab-display">
+        <h3>📜 Session Tabs</h3>
+        <div class="tab-content" id="tab-content">
+            <!-- Tabs will be generated here -->
+            <span style="color: #475569;">Start playing to see your chords in tab format...</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Video Section -->
+        <div class="video-section">
+            <div class="video-container">
+                <video id="webcam" autoplay playsinline muted></video>
+                <canvas id="output-canvas"></canvas>
+            </div>
+
+            <!-- Audio Visualizer -->
+            <div class="card">
+                <h3>🎵 Audio Analysis</h3>
+                <div class="audio-viz" id="audio-visualizer">
+                    <!-- Bars generated by JS -->
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
+                    <div class="status-dot" id="audio-status"></div>
+                    <span id="audio-status-text" style="font-size: 0.85rem; color: #64748b;">Microphone off</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <!-- Status Card -->
+            <div class="card">
+                <h3>System Status</h3>
+                <div class="status-bar">
+                    <div class="status-dot" id="vision-status"></div>
+                    <span id="vision-text">Initializing vision...</span>
+                </div>
+                <div class="btn-group" style="margin-top: 15px;">
+                    <button class="btn btn-primary" id="start-btn">
+                        <span>▶</span> Start
+                    </button>
+                    <button class="btn btn-danger" id="stop-btn" disabled>
+                        <span>⏹</span> Stop
+                    </button>
+                </div>
+                <div class="btn-group" style="margin-top: 10px;">
+                    <button class="btn btn-success" id="audio-btn">
+                        <span>🎤</span> Enable Audio
+                    </button>
+                    <button class="btn btn-primary" id="export-btn">
+                        <span>📥</span> Export Tabs
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chord Display -->
+            <div class="card chord-display">
+                <h3>Current Chord</h3>
+                <div class="chord-symbol" id="chord-symbol">--</div>
+                <div class="chord-name" id="chord-name">Waiting for input</div>
+                <div class="detection-source" id="detection-source">No detection</div>
+            </div>
+
+            <!-- Timer -->
+            <div class="card">
+                <h3>Transition Timer</h3>
+                <div class="timer-display">
+                    <div class="timer-value" id="timer-value">0.00s</div>
+                    <div class="timer-label">Current chord hold time</div>
+                </div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="card">
+                <h3>Practice Metrics</h3>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="accuracy">0%</div>
+                        <div class="metric-label">Accuracy</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="speed">0</div>
+                        <div class="metric-label">Trans/min</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="consistency">0%</div>
+                        <div class="metric-label">Consistency</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="session-time">0:00</div>
+                        <div class="metric-label">Session</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback -->
+            <div class="card">
+                <h3>Real-time Feedback</h3>
+                <div class="feedback-list" id="feedback-list">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Starting FretFly...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <script src="app.js"></script>
+</body>
+</html>
